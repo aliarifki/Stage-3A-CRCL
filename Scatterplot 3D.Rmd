@@ -1,0 +1,113 @@
+---
+title: "scatterplot"
+author: "Alia"
+date: "05/07/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Libraries
+
+```{r}
+library(reshape)
+library(ggplot2)
+library(gridExtra)
+library(RColorBrewer)
+library(corrplot)
+library(rlist)
+library(dplyr)
+require(akima)
+library(latticeExtra)
+library(tidyverse)
+library(openxlsx)
+library(scatterplot3d) # load
+library(plotly)
+```
+
+
+## Importation
+
+```{r}
+#sur melpredict
+choix_tissu <- "(tumor and stroma)"
+choix_methode <- "Density"
+reponse <- readWorkbook("reponses_traitements_melpredict.xlsx", "MELPREDICT + PAIR tot")
+reponse<-as.data.frame(cbind(reponse$Reponse.ICP.1.an, reponse$`n_bloc`, reponse$ZEB1.statut))
+colnames(reponse)<-c("Rep", "ID", "ZEB1")
+reponse$Rep[reponse$Rep %in% c("LR", "LR*")] <- "R"
+reponse$Rep[reponse$Rep %in% c("SR", "NR ")] <- "NR"
+cd8 <- readWorkbook("decompte_phenotypes_cd8.xlsx", paste0("Cell ",choix_methode," ", choix_tissu))
+macro <- readWorkbook("decompte_phenotypes_macrophages.xlsx", paste0("Cell ",choix_methode," ", choix_tissu))
+
+```
+
+
+## Scatterplot 2D
+
+```{r}
+cd8 <- cd8[cd8$ID_tumeur %in% macro$ID_tumeur,]
+macro <- macro[macro$ID_tumeur %in% cd8$ID_tumeur,]
+cd8 <- cd8[order(cd8$ID_tumeur),]
+macro <- macro[order(macro$ID_tumeur),]
+
+reponse <- reponse[reponse$ID %in% macro$ID_tumeur,]
+reponse = reponse[order(reponse$ID),]
+
+data <- cbind(cd8, subset(macro, select = -ID_tumeur), reponse)
+data$CD8. <- data$CD8. + data$CD8.Ki67.
+
+pheno1 <- readline(prompt = "Phénotype 1 : ")
+pheno2 <- readline(prompt = "Phénotype 2 : ")
+pheno3 <- readline(prompt = "Phénotype 3 : ")
+
+data2 <- subset(data[data$ZEB1=="high",])
+data_label <- data[data[,pheno1]>max(data[,pheno1])/2 | data[,pheno2]>max(data[,pheno2])/2,]
+
+gp <- ggplot(data, aes(x = data[,pheno1], y = data[,pheno2], color = Rep, label = ID)) + geom_point(size = data[,pheno3]/max(data[,pheno3])*6) +
+  geom_text(data = data_label, aes(x = data_label[,pheno1], y = data_label[,pheno2], label = ID), size = 2, vjust = -1)+
+  xlab(pheno1) + ylab(pheno2) + theme(plot.title = element_text(size=8)) +
+  ggtitle(paste0(choix_methode," de ",pheno1, " en fonction de ", pheno2, "\n", choix_tissu))+
+  geom_point(data = data2, aes(x = data2[,pheno1], y = data2[,pheno2]),  size = 6, pch = 21, col = "black")
+  
+ggsave("scatterplot2D.jpg", plot=gp, path="scatterplot/", device="jpeg", dpi="retina")
+```
+
+
+## Scatterplot 3D
+
+```{r}
+png(paste0("3D_", choix_methode, "_",choix_tissu,"_", pheno1,"_",pheno2,"_", pheno3, ".png"))
+data$couleurs = 1
+for(i in 1:length(data[,1])){
+  if(data[i,"Rep"]=="NR"){
+    data[i,"couleurs"] = "red"
+  }
+  else{
+    data[i,"couleurs"] = "blue"
+  }
+}
+scatterplot3d(x=data[,pheno1], y=data[,pheno2], z=data[,pheno3], color = data[,"couleurs"], xlab =paste0(pheno1), ylab=paste0(pheno2) , zlab=paste0(pheno3))
+dev.off()
+```
+
+## Plotly
+
+```{r}
+fig <- plot_ly(x=data[,pheno1], y=data[,pheno2], z=data[,pheno3], color = data[,"couleurs"])
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = paste0(pheno1)),
+                     yaxis = list(title = paste0(pheno2)),
+                     zaxis = list(title = paste0(pheno3))))
+fig
+```
+
+
+
+
+
+
+
