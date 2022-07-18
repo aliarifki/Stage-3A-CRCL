@@ -1,0 +1,185 @@
+---
+title: "PCA"
+author: "Alia"
+date: "06/07/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Librairies
+
+```{r}
+install.packages('gridExtra')
+library(FactoMineR)
+library(openxlsx)
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+```
+
+
+## Donn√©es
+
+```{r}
+tissu <- "(tumor)"
+methode <- "Density"
+
+#cd8
+cd8 <- readWorkbook("decompte_phenotypes_cd8.xlsx", paste0("Cell ", methode, " ", tissu))
+
+#macrophage
+macro <- readWorkbook("decompte_phenotypes_macrophages.xlsx", paste0("Cell ", methode," ", tissu))
+
+#reponse
+reponse <- readWorkbook("reponses_traitements_melpredict.xlsx", "MELPREDICT + PAIR tot")
+reponse<-as.data.frame(cbind(reponse$Reponse.ICP.1.an, reponse$`n_bloc`, reponse$ZEB1.statut))
+colnames(reponse)<-c("Rep", "ID", "ZEB1")
+reponse$Rep[reponse$Rep %in% c("LR", "LR*")] <- "R"
+reponse$Rep[reponse$Rep %in% c("SR", "NR ")] <- "NR"
+
+#selection
+cd8 <- cd8[cd8$ID_tumeur %in% macro$ID_tumeur,]
+macro <- macro[macro$ID_tumeur %in% cd8$ID_tumeur,]
+cd8 <- cd8[order(cd8$ID_tumeur),]
+macro <- macro[order(macro$ID_tumeur),]
+
+#liaison
+reponse <- reponse[reponse$ID %in% macro$ID_tumeur,]
+reponse = reponse[order(reponse$ID),]
+
+data <- cbind(cd8, subset(macro, select = -ID_tumeur), reponse)
+cd8 <- cbind(cd8, reponse)
+macro <- cbind(macro, reponse)
+
+```
+
+## cd8
+
+```{r}
+png(paste0("pca/pca_cd8", "_", methode, "_", tissu, ".png"))
+pca <- PCA(subset(cd8, select=-c(ID_tumeur, ID)), quali.sup =11)
+dev.off()
+
+png(paste0("pca/pca_scatterplot_cd8", "_", methode, "_", tissu, ".png"))
+plot(pca, habillage=11, label="none")
+dev.off()
+```
+
+## macrophage
+
+```{r}
+png(paste0("pca/pca_macrophage", "_", methode, "_", tissu, ".png"))
+pca <- PCA(subset(macro, select = -c(ID_tumeur, ID)), quali.sup =12)
+dev.off()
+
+png(paste0("pca/pca_scatterplot_macrophage", "_", methode, "_", tissu, ".png"))
+plot(pca, habillage=12, label="none")
+dev.off()
+```
+
+## les deux
+
+```{r}
+png(paste0("pca/pca_macrophage_cd8", "_", methode, "_", tissu, ".png"))
+pca <- PCA(subset(data, select=-c(ID_tumeur,ID)), quali.sup = 22)
+dev.off()
+
+png(paste0("pca/pca_scatterplot_macrophage_cd8", "_", methode, "_", tissu, ".png"))
+plot(pca, habillage=22, label="none")
+dev.off()
+```
+
+## Normalisation
+
+```{r}
+datanormalise = subset(data, select=-c(ID_tumeur, Rep, ID, ZEB1))
+for(i in 1:length(datanormalise)){
+  datanormalise[,i]= -1 + (datanormalise[,i]-min(datanormalise[,i]))*2/(max(datanormalise[,i])-min(datanormalise[,i]))
+}
+
+datanormalise <- cbind(datanormalise, data$Rep, data$ID, data$ZEB1)
+```
+
+
+## R√©pondeurs
+
+```{r}
+
+
+repondeurs <- datanormalise[datanormalise$`data$Rep`=="R", ]
+
+melted_cormatr <- reshape2::melt(subset(repondeurs, select=-c(Sox10.PDL1., Sox10., DAPI., CD68.CD163.pSTAT1., CD66b., CD4.Ki67., CD8.PD1.Ki67., SOX10.ZEB1.,SOX10.Ki67., SOX10.)))
+
+
+gpr <- ggplot(data = melted_cormatr, aes(x=`data$ID`, y=variable, fill=value)) +
+      scale_fill_gradient2(low="blue", mid="white", high="red")+geom_tile()+
+      ggtitle("RÈpondeurs")+xlab("")+ylab("")+theme(axis.text.x=element_blank(), legend.position = 'None')
+
+ggsave("repondeurs.jpg", plot=gpr, device="jpeg", path="heatmap/", dpi="retina")
+```
+
+## Non r√©pondeurs
+
+```{r}
+nonrepondeurs <- datanormalise[datanormalise$`data$Rep`=="NR", ]
+
+melted_cormatnr <- reshape2::melt(subset(nonrepondeurs, select=-c(Sox10.PDL1., Sox10., DAPI., CD68.CD163.pSTAT1., CD66b., CD4.Ki67., CD8.PD1.Ki67., SOX10.ZEB1.,SOX10.Ki67., SOX10.)))
+
+
+gpnr <- ggplot(data = melted_cormatnr, aes(x=`data$ID`, y=variable, fill=value)) +
+      scale_fill_gradient2(low="blue", mid="white", high="red")+geom_tile()+
+      ggtitle("Non rÈpondeurs")+xlab("")+ylab("")+theme(axis.text=element_blank())
+gpnr
+
+ggsave("nonrepondeurs.jpg", plot=gpnr, device="jpeg", path="heatmap/", dpi="retina")
+```
+
+```{r}
+gp = grid.arrange(gpr, gpnr, nrow=1, ncol=2)
+ggsave("Heatmap_R_NR.jpg", plot=gp, device="jpeg", path="heatmap/", dpi="retina",  width=3000, height=1000, units='px')
+
+```
+
+
+## low ZEB1
+```{r}
+
+
+low <- datanormalise[datanormalise$`data$ZEB1`=="low", ]
+
+melted_cormatl <- reshape2::melt(subset(low, select=-c(Sox10.PDL1., Sox10., DAPI., CD68.CD163.pSTAT1., CD66b., CD4.Ki67., CD8.PD1.Ki67., SOX10.ZEB1.,SOX10.Ki67., SOX10.)))
+
+
+gpl <- ggplot(data = melted_cormatl, aes(x=`data$ID`, y=variable, fill=value)) +
+      scale_fill_gradient2(low="blue", mid="white", high="red")+geom_tile()+
+      ggtitle("ZEB1 low")+xlab("")+ylab("")+theme(axis.text.x=element_blank(), legend.position = 'None')
+gpl
+
+ggsave("ZEB1low.jpg", plot=gpr, device="jpeg", path="heatmap/", dpi="retina")
+```
+
+## high
+
+```{r}
+high <- datanormalise[datanormalise$`data$ZEB1`=="high", ]
+
+melted_cormath <- reshape2::melt(subset(high, select=-c(Sox10.PDL1., Sox10., DAPI., CD68.CD163.pSTAT1., CD66b., CD4.Ki67., CD8.PD1.Ki67., SOX10.ZEB1.,SOX10.Ki67., SOX10.)))
+
+
+gph <- ggplot(data = melted_cormath, aes(x=`data$ID`, y=variable, fill=value)) +
+      scale_fill_gradient2(low="blue", mid="white", high="red")+geom_tile()+
+      ggtitle("ZEB1 high")+xlab("")+ylab("")+theme(axis.text=element_blank())
+gph
+
+ggsave("ZEB1high.jpg", plot=gpnr, device="jpeg", path="heatmap/", dpi="retina")
+```
+
+```{r}
+gp2 = grid.arrange(gpl, gph, nrow=1, ncol=2)
+ggsave("Heatmap_ZEB1.jpg", plot=gp2, device="jpeg", path="heatmap/", dpi="retina",  width=3000, height=1000, units='px')
+
+```
