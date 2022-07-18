@@ -1,0 +1,62 @@
+---
+title: "histogrammes"
+author: "Alia"
+date: "04/07/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Importation
+
+```{r cars}
+##### Melpredict
+#chargement des donnees (Melpredict - macrophage)
+datas1<-read.table("Melpred-macro.txt", sep = ",", header = TRUE)
+path_1 <- na.omit(datas1$path)
+dossier_data1 <- na.omit(datas1$dossier_data)
+id_tumeurs1 <- na.omit(datas1$id_tumeurs)
+#####
+#chargement des donnees (Melpredict - cd8)
+datas2<-read.table("Melpred-cd8.txt", sep = ",", header = TRUE)
+path_2 <- na.omit(datas2$path)
+id_tumeurs2 <- na.omit(datas2$id_tumeurs)
+dossier_data2 <- na.omit(datas2$dossier_data)
+dossier_superposition <- "melpredict/macro_pheno_superposes/"
+panel2_nom<-"pheno"
+
+sum(id_tumeurs1!=id_tumeurs2)==0
+
+phenotypes <- c(na.omit(datas1$phenotypes), na.omit(datas2$phenotypes))
+
+```
+
+
+## Histogrammes
+
+```{r pressure}
+listephenotypes = c("CD68+","CD66b+","CD68+CD163+","CD68+CD163+PDL1+","CD68+CD163+pSTAT1+","CD68+PDL1+","CD68+pSTAT1+","CD68+pSTAT1+PDL1+","DAPI+","Sox10+","Sox10+PDL1+","SOX10+","SOX10+Ki67+","SOX10+ZEB1+","CD8+","CD8+PD1+","CD8+Ki67+","CD8+PD1+Ki67+","CD4+","CD4+PD1+","CD4+Ki67+")
+print(listephenotypes)
+a = as.numeric(readline(prompt = "Choisir un phénotype (entre 1 et 21) : "))
+if(dir.exists(paste0("image/", listephenotypes[a]))==0){
+  dir.create(paste0("image/", listephenotypes[a]))
+
+  for(i in 1:length(id_tumeurs1)){
+    if(file.exists(paste0("matrice_regions_",id_tumeurs1[i]))){
+      load(paste0("matrice_regions_",id_tumeurs1[i]))
+      phenotypes1 <- m[1,3]
+      all_phenotypes <- matrix(unlist(m[-1,3]), nrow=length(as.matrix(phenotypes))+1)#le +1 correspond a la case panel_present
+      b = all_phenotypes[a,]
+      b = c(b[b!=0],1)
+      png(paste0("image/", listephenotypes[a], "/", listephenotypes[a], id_tumeurs1[i], ".png"))
+      hist(b, nclass=40)
+      dev.off()
+    }
+  }
+}
+```
+
+
+
