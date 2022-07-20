@@ -91,7 +91,10 @@ colnames(tableaudedonnees) = c("Phenotype 1", "Phenotype 2", "Repondeurs", "Non 
 
 
 #Excel
-
-wb = createWorkbook("C:/Users/aliar/Desktop/INSA/Stage/Distances_R_NR.xlsx")
+wb = createWorkbook()
 addWorksheet(wb, "Moyenne des distances")
-write.xlsx(x = reponse, file = "C:/Users/aliar/Desktop/INSA/Stage/Distances_R_NR.xlsx", sheetName = "Statut de réponse", append=T)
+writeData(wb, "Moyenne des distances", tableaudedonnees)
+addWorksheet(wb, "Statut reponse")
+writeData(wb, "Statut reponse", reponse)
+
+saveWorkbook(wb, "C:/Users/aliar/Desktop/INSA/Stage/Distances_R_NR.xlsx")
